@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kirka.io Bounty Hunts</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-zinc-950">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    function App() {
+      const [theme, setTheme] = useState("dark");
+      const [currentPage, setCurrentPage] = useState("home");
+      const [username, setUsername] = useState("");
+      const [onlinePlayers, setOnlinePlayers] = useState([]);
+      const [completedBounties, setCompletedBounties] = useState([]);
+      const [leaderboard, setLeaderboard] = useState([]);
+      const [teams, setTeams] = useState([]);
+      const [reports, setReports] = useState([]);
+      const [accounts, setAccounts] = useState([]);
+      const [currentUser, setCurrentUser] = useState(null);
+      const [isAdmin, setIsAdmin] = useState(false);
+
+      const [loginForm, setLoginForm] = useState({
+        username: "",
+        password: "",
+      });
+
+      const [teamForm, setTeamForm] = useState({
+        name: "",
+        leader: "",
+      });
+
+      const [reportForm, setReportForm] = useState({
+        reportedPlayer: "",
+        reason: "",
+        evidence: "",
+      });
+
+      const [newBountyForm, setNewBountyForm] = useState({
+        target: "",
+        reward: "",
+        difficulty: "Medium",
+        mode: "Team Deathmatch",
+      });
+
+      const [bounties, setBounties] = useState([]);
+
+      const getLevel = (wins) => {
+        if (wins >= 10) return "Legend";
+        if (wins >= 5) return "Elite";
+        return "Assassin";
+      };
+
+      const getBadge = (wins) => {
+        return wins >= 5 ? "Trusted Hunter" : "None";
+      };
+
+      const joinWebsite = () => {
+        if (!username.trim()) return;
+
+        const player = {
+          name: username,
+          joinedAt: new Date().toLocaleTimeString(),
+        };
+
+        setOnlinePlayers((prev) => [...prev, player]);
+
+        setLeaderboard((prev) => [
+          {
+            player: username,
+            streak: Math.floor(Math.random() * 25 + 1),
+            completed: Math.floor(Math.random() * 20 + 1),
+          },
+          ...prev,
+        ]);
+
+        setUsername("");
+      };
+
+      const completeBounty = (index) => {
+        const bounty = bounties[index];
+        const reward = parseInt(bounty.reward || 0);
+        const finalReward = Math.floor(reward * 0.9);
+
+        setCompletedBounties((prev) => [
+          {
+            ...bounty,
+            finalReward,
+            splitReward: Math.floor(finalReward / 3),
+            completedAt: new Date().toLocaleString(),
+          },
+          ...prev,
+        ]);
+
+        if (currentUser) {
+          const wins = currentUser.wins + 1;
+
+          setCurrentUser({
+            ...currentUser,
+            wins,
+            level: getLevel(wins),
+            badge: getBadge(wins),
+            earnings: currentUser.earnings + finalReward,
+          });
+        }
+
+        setBounties((prev) => prev.filter((_, i) => i !== index));
+      };
+
+      const createTeam = () => {
+        if (!teamForm.name || !teamForm.leader) return;
+
+        setTeams((prev) => [
+          {
+            name: teamForm.name,
+            leader: teamForm.leader,
+            members: [teamForm.leader],
+          },
+          ...prev,
+        ]);
+
+        setTeamForm({ name: "", leader: "" });
+      };
+
+      const joinTeam = (teamName) => {
+        if (!currentUser) return;
+
+        setTeams((prev) =>
+          prev.map((team) => {
+            if (team.name === teamName) {
+              return {
+                ...team,
+                members: [...new Set([...team.members, currentUser.username])],
+              };
+            }
+            return team;
+          })
+        );
+      };
+
+      const submitReport = () => {
+        if (!reportForm.reportedPlayer || !reportForm.reason) return;
+
+        setReports((prev) => [
+          {
+            ...reportForm,
+            submittedAt: new Date().toLocaleString(),
+          },
+          ...prev,
+        ]);
+
+        setReportForm({
+          reportedPlayer: "",
+          reason: "",
+          evidence: "",
+        });
+      };
+
+      const loginAccount = () => {
+        if (!loginForm.username || !loginForm.password) return;
+
+        const account = {
+          username: loginForm.username,
+          wins: 0,
+          earnings: 0,
+          clan: "No Clan",
+          level: "Assassin",
+          badge: "None",
+        };
+
+        setAccounts((prev) => [...prev, account]);
+        setCurrentUser(account);
+
+        if (loginForm.username.toLowerCase() === "admin") {
+          setIsAdmin(true);
+        }
+
+        setLoginForm({ username: "", password: "" });
+      };
+
+      const createBounty = () => {
+        if (!currentUser) return;
+        if (!newBountyForm.target || !newBountyForm.reward) return;
+
+        setBounties((prev) => [
+          {
+            player: newBountyForm.target,
+            reward: newBountyForm.reward,
+            difficulty: newBountyForm.difficulty,
+            mode: newBountyForm.mode,
+            team: currentUser.clan,
+            creator: currentUser.username,
+          },
+          ...prev,
+        ]);
+
+        setNewBountyForm({
+          target: "",
+          reward: "",
+          difficulty: "Medium",
+          mode: "Team Deathmatch",
+        });
+      };
+
+      const banAccount = (name) => {
+        alert(`${name} has been banned.`);
+      };
+
+      const containerClass =
+        theme === "dark"
+          ? "min-h-screen bg-zinc-950 text-white p-8"
+          : "min-h-screen bg-zinc-100 text-black p-8";
+
+      return (
+        <div className={containerClass}>
+          <div className="max-w-7xl mx-auto">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+              <h1 className="text-5xl font-black text-orange-400">
+                Kirka.io Bounty Hunts
+              </h1>
+
+              <a
+                href="https://discord.gg/pQEkGQV8xz"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-2xl font-bold"
+              >
+                Connected Discord Server
+              </a>
+            </div>
+
+            <div className="flex flex-wrap gap-3 mb-8">
+              {["home", "leaderboard", "teams", "players", "reports", "account", "settings", "admin"].map((page) => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className="bg-zinc-800 hover:bg-zinc-700 px-5 py-2 rounded-xl font-bold capitalize"
+                >
+                  {page}
+                </button>
+              ))}
+
+              <button
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className="bg-white text-black px-5 py-2 rounded-xl font-bold"
+              >
+                Toggle Theme
+              </button>
+            </div>
+
+            {currentPage === "home" && (
+              <div className="space-y-8">
+                <div className="bg-zinc-900 rounded-3xl p-6 border border-orange-700">
+                  <h2 className="text-3xl font-bold text-orange-400 mb-5">
+                    Create New Bounty
+                  </h2>
+
+                  {currentUser ? (
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <input
+                        placeholder="Target Player"
+                        value={newBountyForm.target}
+                        onChange={(e) => setNewBountyForm({ ...newBountyForm, target: e.target.value })}
+                        className="bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3"
+                      />
+
+                      <input
+                        placeholder="Reward Amount"
+                        value={newBountyForm.reward}
+                        onChange={(e) => setNewBountyForm({ ...newBountyForm, reward: e.target.value })}
+                        className="bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3"
+                      />
+
+                      <select
+                        value={newBountyForm.difficulty}
+                        onChange={(e) => setNewBountyForm({ ...newBountyForm, difficulty: e.target.value })}
+                        className="bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3"
+                      >
+                        <option>Easy</option>
+                        <option>Medium</option>
+                        <option>Hard</option>
+                        <option>Extreme</option>
+                      </select>
+
+                      <button
+                        onClick={createBounty}
+                        className="bg-orange-500 hover:bg-orange-400 rounded-xl font-bold"
+                      >
+                        Set Bounty
+                      </button>
+                    </div>
+                  ) : (
+                    <p>Create an account to create bounties.</p>
+                  )}
+                </div>
+
+                <div className="bg-zinc-900 rounded-3xl p-6">
+                  <h2 className="text-3xl font-bold text-indigo-400 mb-4">
+                    Join Website
+                  </h2>
+
+                  <div className="flex gap-4">
+                    <input
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Username"
+                      className="flex-1 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3"
+                    />
+
+                    <button
+                      onClick={joinWebsite}
+                      className="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-xl font-bold"
+                    >
+                      Join
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 min-h-[1200px]">
+                  {bounties.length === 0 ? (
+                    <div className="bg-zinc-900 rounded-3xl p-10 border border-zinc-800 text-center">
+                      <h3 className="text-3xl font-black text-zinc-400 mb-4">
+                        No Active Bounties
+                      </h3>
+
+                      <p className="text-zinc-500 text-lg">
+                        Players must create accounts and place bounties.
+                      </p>
+                    </div>
+                  ) : (
+                    bounties.map((bounty, index) => (
+                      <div
+                        key={index}
+                        className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6"
+                      >
+                        <h3 className="text-2xl font-bold text-orange-300 mb-3">
+                          {bounty.player}
+                        </h3>
+
+                        <div className="space-y-2 text-zinc-300">
+                          <p>Reward: {bounty.reward} KR</p>
+                          <p>Difficulty: {bounty.difficulty}</p>
+                          <p>Mode: {bounty.mode}</p>
+                          <p>Team: {bounty.team}</p>
+                          <p>Created By: {bounty.creator}</p>
+                        </div>
+
+                        <button
+                          onClick={() => completeBounty(index)}
+                          className="w-full mt-6 bg-green-600 hover:bg-green-500 py-3 rounded-2xl font-bold"
+                        >
+                          Complete Bounty
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {currentPage === "leaderboard" && (
+              <div>
+                <h2 className="text-4xl font-black text-yellow-400 mb-6">Live Leaderboard</h2>
+
+                <div className="space-y-4">
+                  {[...leaderboard]
+                    .sort((a, b) => b.streak - a.streak)
+                    .map((player, index) => (
+                      <div key={index} className="bg-zinc-900 rounded-3xl p-6 flex justify-between">
+                        <div>
+                          <h3 className="text-2xl font-bold">
+                            #{index + 1} {player.player}
+                          </h3>
+                          <p>Completed Hunts: {player.completed}</p>
+                        </div>
+
+                        <div>
+                          <p className="text-3xl font-black text-orange-400">
+                            {player.streak}
+                          </p>
+                          <p>Hunter Streak</p>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {currentPage === "teams" && (
+              <div>
+                <h2 className="text-4xl font-black text-cyan-400 mb-6">Hunter Teams</h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <input
+                    placeholder="Team Name"
+                    value={teamForm.name}
+                    onChange={(e) => setTeamForm({ ...teamForm, name: e.target.value })}
+                    className="bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3"
+                  />
+
+                  <input
+                    placeholder="Leader Username"
+                    value={teamForm.leader}
+                    onChange={(e) => setTeamForm({ ...teamForm, leader: e.target.value })}
+                    className="bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3"
+                  />
+
+                  <button
+                    onClick={createTeam}
+                    className="bg-cyan-600 hover:bg-cyan-500 rounded-xl font-bold"
+                  >
+                    Create Team
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {teams.map((team, index) => (
+                    <div key={index} className="bg-zinc-900 rounded-3xl p-6 border border-cyan-800">
+                      <h3 className="text-2xl font-bold text-cyan-300 mb-3">
+                        {team.name}
+                      </h3>
+
+                      <p>Leader: {team.leader}</p>
+                      <p className="mt-2 text-cyan-300">3-player strike squads enabled.</p>
+
+                      <div className="flex flex-wrap gap-2 mt-4 mb-4">
+                        {team.members.map((member, i) => (
+                          <span
+                            key={i}
+                            className="bg-cyan-500/20 text-cyan-300 px-3 py-1 rounded-full"
+                          >
+                            {member}
+                          </span>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={() => joinTeam(team.name)}
+                        className="w-full bg-cyan-600 hover:bg-cyan-500 py-3 rounded-2xl font-bold"
+                      >
+                        Join Team
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {currentPage === "players" && (
+              <div>
+                <h2 className="text-4xl font-black text-indigo-400 mb-6">Online Players</h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                  {onlinePlayers.map((player, index) => (
+                    <div key={index} className="bg-zinc-900 rounded-3xl p-6 border border-indigo-700">
+                      <h3 className="text-2xl font-bold text-indigo-300">{player.name}</h3>
+                      <p className="text-zinc-400 mt-2">Joined: {player.joinedAt}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {currentPage === "reports" && (
+              <div>
+                <h2 className="text-4xl font-black text-red-400 mb-6">Player Reports</h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <input
+                    placeholder="Reported Player"
+                    value={reportForm.reportedPlayer}
+                    onChange={(e) => setReportForm({ ...reportForm, reportedPlayer: e.target.value })}
+                    className="bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3"
+                  />
+
+                  <input
+                    placeholder="Reason"
+                    value={reportForm.reason}
+                    onChange={(e) => setReportForm({ ...reportForm, reason: e.target.value })}
+                    className="bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3"
+                  />
+
+                  <input
+                    placeholder="Evidence Link"
+                    value={reportForm.evidence}
+                    onChange={(e) => setReportForm({ ...reportForm, evidence: e.target.value })}
+                    className="bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3"
+                  />
+                </div>
+
+                <button
+                  onClick={submitReport}
+                  className="bg-red-600 hover:bg-red-500 px-6 py-3 rounded-2xl font-bold"
+                >
+                  Submit Report
+                </button>
+              </div>
+            )}
+
+            {currentPage === "account" && (
+              <div>
+                <h2 className="text-4xl font-black text-purple-400 mb-6">Accounts & Profiles</h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <input
+                    placeholder="Username"
+                    value={loginForm.username}
+                    onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                    className="bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3"
+                  />
+
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    value={loginForm.password}
+                    onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                    className="bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3"
+                  />
+
+                  <button
+                    onClick={loginAccount}
+                    className="bg-purple-600 hover:bg-purple-500 rounded-xl font-bold"
+                  >
+                    Login / Create
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-4 mb-6">
+                  <button
+                    onClick={() => {
+                      const discordUser = {
+                        username: `DiscordUser${Math.floor(Math.random() * 9999)}`,
+                        wins: 0,
+                        earnings: 0,
+                        clan: "No Clan",
+                        level: "Assassin",
+                        badge: "None",
+                        discordLinked: true,
+                      };
+
+                      setAccounts((prev) => [...prev, discordUser]);
+                      setCurrentUser(discordUser);
+                    }}
+                    className="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-2xl font-bold"
+                  >
+                    Discord OAuth Login
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const googleUser = {
+                        username: `GoogleUser${Math.floor(Math.random() * 9999)}`,
+                        wins: 0,
+                        earnings: 0,
+                        clan: "No Clan",
+                        level: "Assassin",
+                        badge: "None",
+                        googleLinked: true,
+                      };
+
+                      setAccounts((prev) => [...prev, googleUser]);
+                      setCurrentUser(googleUser);
+                    }}
+                    className="bg-white text-black hover:bg-zinc-200 px-6 py-3 rounded-2xl font-bold"
+                  >
+                    Login With Google
+                  </button>
+                </div>
+
+                {currentUser && (
+                  <div className="bg-zinc-900 rounded-3xl p-6 border border-purple-700">
+                    <h3 className="text-3xl font-bold text-purple-300 mb-4">
+                      {currentUser.username}
+                    </h3>
+
+                    <div className="space-y-2 text-lg">
+                      <p>Level: {currentUser.level}</p>
+                      <p>Badge: {currentUser.badge}</p>
+                      <p>Bounty Wins: {currentUser.wins}</p>
+                      <p>Earnings: {currentUser.earnings} KR</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {currentPage === "settings" && (
+              <div>
+                <h2 className="text-4xl font-black text-orange-400 mb-6">Website Settings</h2>
+
+                <div className="bg-zinc-900 rounded-3xl p-8 space-y-4">
+                  <p>10% cut applied to completed bounty rewards.</p>
+                  <p>3-player squads split rewards evenly.</p>
+                  <p>Send screenshots into the Discord verification channel.</p>
+                </div>
+              </div>
+            )}
+
+            {currentPage === "admin" && isAdmin && (
+              <div>
+                <h2 className="text-4xl font-black text-red-500 mb-6">Admin Dashboard</h2>
+
+                <div className="space-y-4">
+                  {accounts.map((account, index) => (
+                    <div key={index} className="bg-zinc-900 rounded-3xl p-6 flex justify-between">
+                      <h3 className="text-2xl font-bold">{account.username}</h3>
+
+                      <button
+                        onClick={() => banAccount(account.username)}
+                        className="bg-red-600 hover:bg-red-500 px-5 py-2 rounded-xl font-bold"
+                      >
+                        Ban Account
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-16">
+              <h2 className="text-4xl font-black text-green-400 mb-6">Completed Bounties</h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {completedBounties.map((bounty, index) => (
+                  <div key={index} className="bg-zinc-900 rounded-3xl p-6 border border-green-700">
+                    <h3 className="text-2xl font-bold text-green-300 mb-3">
+                      {bounty.player}
+                    </h3>
+
+                    <div className="space-y-2 text-zinc-300">
+                      <p>Reward Status: Pending Verification</p>
+                      <p>Final Reward: {bounty.finalReward} KR</p>
+                      <p>Squad Split: {bounty.splitReward} KR each</p>
+                      <p>Completed: {bounty.completedAt}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
